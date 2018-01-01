@@ -11,7 +11,9 @@ var Game = function () {
     this.bgStage = new PIXI.Stage();
 
     //setup the rendering surface
-    this.renderer = new PIXI.CanvasRenderer(this._width, this._height,null);
+    this.renderer = new PIXI.CanvasRenderer(this._width, this._height, {
+        transparent: true
+    });
     document.body.appendChild(this.renderer.view);
 
     //create the main stage to draw on
@@ -23,8 +25,8 @@ var Game = function () {
     })
 
     //speed parameters of the ship
-    this.speed = 1000;
-    this.turnSpeed = 2;
+    this.speed = 100;
+    this.turnSpeed = 5;
 
     window.addEventListener('keydown', function (event) {
         this.handleKeys(event.keyCode, true)
@@ -150,19 +152,30 @@ Game.prototype = {
         this.ship.addShape(this.shipShape);
         this.world.addBody(this.ship);
 
-        this.shipGraphics = new PIXI.Graphics();
+        var shipGraphics = new PIXI.Graphics();
 
         //draw the ships body
-        this.shipGraphics.beginFill(0x20d3fe);
-        this.shipGraphics.moveTo(0, 0);
-        this.shipGraphics.lineTo(-26, 60);
-        this.shipGraphics.lineTo(26, 60);
-        this.shipGraphics.endFill();
+        shipGraphics.beginFill(0x20d3fe);
+        shipGraphics.moveTo(26, 0);
+        shipGraphics.lineTo(0, 60);
+        shipGraphics.lineTo(52, 60);
+        shipGraphics.endFill();
 
         //add engine to the ship
-        this.shipGraphics.beginFill(0x1495d1);
-        this.shipGraphics.drawRect(-15, 60, 30, 8);
-        this.shipGraphics.endFill();
+        shipGraphics.beginFill(0x1495d1);
+        shipGraphics.drawRect(7, 60, 38, 8);
+        shipGraphics.endFill();
+
+        //create the ship to only use one draw per call tick
+        var shipCache = new PIXI.CanvasRenderer(52, 69, {
+            transparent: true
+        });
+        var shipCacheStage = new PIXI.Stage();
+        shipCacheStage.addChild(shipGraphics);
+        shipCache.render(shipCacheStage);
+
+        var shipTexture = PIXI.Texture.fromCanvas(shipCache.view);
+        this.shipGraphics = new PIXI.Sprite(shipTexture);
 
         //attach the ship to the stage
         this.stage.addChild(this.shipGraphics);
@@ -213,6 +226,27 @@ Game.prototype = {
         }, */
 
     createEnemies: function () {
+        //create the graphics object
+        var enemyGraphics = new PIXI.Graphics();
+        enemyGraphics.beginFill(0x38d41a);
+        enemyGraphics.drawCircle(20, 20, 20);
+        enemyGraphics.endFill();
+
+        enemyGraphics.beginFill(0x2aff00);
+        enemyGraphics.lineStyle(1, 0x239d0b, 1);
+        enemyGraphics.drawCircle(20, 20, 10);
+        enemyGraphics.endFill();
+
+        //create enemy cache
+        var enemyCache = new PIXI.CanvasRenderer(40, 40, {
+            transparent: true
+        });
+        var enemyCacheStage = new PIXI.Stage();
+        enemyCacheStage.addChild(enemyGraphics);
+        enemyCache.render(enemyCacheStage);
+
+        var enemyTexture = PIXI.Texture.fromCanvas(enemyCache.view);
+
         //create random interval to generate enemies
         this.enemyTimer = setInterval(function () {
             //create enemy phiscs body
@@ -237,22 +271,12 @@ Game.prototype = {
             enemy.addShape(enemyShape);
             this.world.addBody(enemy);
 
-            //create the graphics object
-            var enemyGraphics = new PIXI.Graphics();
-            enemyGraphics.beginFill(0x38d41a);
-            enemyGraphics.drawCircle(0, 0, 20);
-            enemyGraphics.endFill();
-
-            enemyGraphics.beginFill(0x2aff00);
-            enemyGraphics.lineStyle(1, 0x239d0b, 1);
-            enemyGraphics.drawCircle(0, 0, 10);
-            enemyGraphics.endFill();
-
-            this.stage.addChild(enemyGraphics);
+            var enemySprite = new PIXI.Sprite(enemyTexture);
+            this.stage.addChild(enemySprite);
 
             //keep track of these enemies
             this.enemyBodies.push(enemy);
-            this.enemyGraphics.push(enemyGraphics);
+            this.enemyGraphics.push(enemySprite);
         }.bind(this), 1000);
 
         this.world.on('beginContact', function (event) {
@@ -269,13 +293,16 @@ Game.prototype = {
      */
     handleKeys: function (code, state) {
         switch (code) {
+            case 37:
             case 65: //A
                 this.keyLeft = state;
                 break;
+            case 39:
             case 68: //D
                 this.keyRight = state;
                 break;
-            case 87: //A
+            case 38:
+            case 87: //W
                 this.keyUp = state;
                 break;
         }
@@ -297,6 +324,7 @@ Game.prototype = {
             this.ship.force[0] -= this.speed * Math.cos(angle);
             this.ship.force[1] -= this.speed * Math.sin(angle);
         }
+
         //update the position of the graphics based on the 
         //physics simulation position
         this.shipGraphics.x = this.ship.position[0];
